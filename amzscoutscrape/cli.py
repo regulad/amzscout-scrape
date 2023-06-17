@@ -21,17 +21,15 @@ from __future__ import annotations
 
 import csv
 import logging
-import random
 import time
 from pathlib import Path
 from typing import cast
 
 import typer
 from _csv import Writer
-from rich.progress import Progress, SpinnerColumn, TextColumn, track
+from rich.logging import RichHandler
+from rich.progress import track
 from selenium.webdriver.chrome.webdriver import WebDriver
-from selenium.webdriver.common.by import By
-from undetected_chromedriver import Chrome, ChromeOptions
 
 from . import AmzscoutscrapeAssets, __copyright__, __title__, __version__, metadata
 from .driver import get_clean_driver
@@ -68,7 +66,11 @@ def info(n_seconds: float = 0.01, verbose: bool = False) -> None:
 
 @cli.command()
 def generate(
-    filename: str = "amzscout.csv", headful: bool = False, queries: int = -1, skip: int = 0
+    filename: str = "amzscout.csv",
+    verbose: bool = False,
+    headful: bool = False,
+    queries: int = -1,
+    skip: int = 0,
 ) -> None:
     """
     Generate a basic csv from AMZScout data.
@@ -77,10 +79,14 @@ def generate(
 
     Args:
         skip: How many queries to skip ahead
+        verbose: Output more info
         queries: The number of queries to run. Defaults to None, which means all queries.
         filename: The filename to write to. Defaults to "amzscout.csv".
         headful: Weather or not a Chrome window should be opened. This is only useful for debugging.
     """
+    if verbose:
+        logging.basicConfig(level=logging.INFO, handlers=[RichHandler()])
+
     with AmzscoutscrapeAssets.path("amazon_products.txt").open("r") as fp:
         potential_queries = [line.strip() for line in fp.readlines()][skip:queries]
 
