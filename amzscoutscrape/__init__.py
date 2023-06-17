@@ -61,9 +61,10 @@ class AmzscoutscrapeAssets:
         Raises:
             FileNotFoundError: If the path does not exist
         """
-        path = Path(__file__.parent, "resources", *nodes)
+        path = Path(Path(__file__).parent, "resources", *nodes)
         if not path.exists():
             raise FileNotFoundError(f"Asset {path} not found")
+        return path
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -98,10 +98,12 @@ amzscout-scrape = "amzscoutscrape.cli:cli"
 # TODO Add and remove dependencies here
 # These are dependencies that are included in the main package
 python                   = "^3.11"
-typer                    = "^0.3"
+typer                    = {extras = ["all"], version = "^0.9"}
 undetected-chromedriver = "^3.5.0"
 selenium = "^4.10.0"
 beautifulsoup4 = "^4.12.2"
+requests = {extras = ["socks", "security"], version = "^2.31.0"}
+rich = "^13.4.2"
 
 [tool.poetry.dev-dependencies]
 # TODO Remove build dependencies you don't want (like xdoctest, perhaps)

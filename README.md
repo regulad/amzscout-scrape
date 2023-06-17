@@ -25,6 +25,61 @@ Generate a dataset ready for data science from AMZScout without paying a dime.
 And it’s further described in this paragraph.
 [See the docs 📚](https://amzscout-scrape.readthedocs.io/en/stable/) for more info.
 
+# About
+
+This uses undetected chromedriver and the [AMZScout extension `njopapoodmifmcogpingplfphojnfeea`](https://chrome.google.com/webstore/detail/amazon-product-finder-amz/njopapoodmifmcogpingplfphojnfeea?utm_source=webapp&utm_medium=amzscout_wa&utm_campaign=topbanner?utm_source=webapp) to extract information from Amazon product pages.
+
+# Using
+
+## Dependencies
+
+### `chromedriver`
+
+Make sure you install `chromedriver` on your system alongside a recent version of Chrome or Chromium.
+
+#### brew (macOS & Linux)
+
+```bash
+brew install chromedriver
+```
+
+#### Other platforms
+
+Refer to https://sites.google.com/chromium.org/driver/downloads?authuser=0 for instructions downloading chromedriver on your respective system.
+
+### poetry
+
+With a good version of Python installed, run the following:
+
+```bash
+pip install pipx
+pipx install poetry
+```
+
+If you get a memo about it not being on your path, Google will be your best friend.
+
+## Installation
+
+```bash
+git clone https://github.com/regulad/amzscout-scrape.git
+cd amzscout-scrape
+poetry install
+```
+
+## Usage
+
+Usage is about as simple as it gets.
+
+```bash
+poetry run amzscout-scrape --help
+```
+
+It will keep you updated, although it will take a hot minute.
+
+Once it's done, you'll have a CSV file in the current directory.
+
+# Appendix
+
 Licensed under the terms of the [Apache License 2.0](https://spdx.org/licenses/Apache-2.0.html).
 [New issues](https://github.com/regulad/amzscout-scrape/issues) and pull requests are welcome.
 Please refer to the [contributing guide](https://github.com/regulad/amzscout-scrape/blob/main/CONTRIBUTING.md)
