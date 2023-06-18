@@ -4,7 +4,7 @@ title: amzscout-scrape
 version: 0.1.0
 abstract: Generate a dataset ready for data science from AMZScout without paying a dime
 authors:
-    - family-names: $${author.last#1}
-      given-names: $${author.first#1}
+    - family-names: Wahle
+      given-names: Parker
 keywords: ["amazon", "dropshipping", "dataset", "csv", "scrape"]
-date-released: $${today.zulu}
+date-released: 2023-06-18

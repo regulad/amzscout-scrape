@@ -17,6 +17,8 @@ permissions and limitations under the License.
 
 """
 import logging
+import tempfile
+import zipfile
 from pathlib import Path
 from time import sleep
 from typing import Any
@@ -34,7 +36,7 @@ from .proxy import fetch_working_proxy
 from .utils import reverse_map
 
 logger = logging.getLogger(__package__)
-EXTENSION = AmzscoutscrapeAssets.path("extensions", "extension_2_4_3_4")
+EXTENSION = AmzscoutscrapeAssets.path("extensions", "extension_2_4_3_4.crx")
 
 
 def identify_websites(driver: WebDriver) -> dict[str, str]:
@@ -57,7 +59,13 @@ def get_clean_driver(
 ) -> WebDriver:
     logger.info("Creating driver...")
     options: ChromiumOptions = (uChromeOptions if undetected else Options)()
-    options.add_argument(f"--load-extension={EXTENSION}")
+    # need to unpack the extension
+    extension_folder = Path(tempfile.gettempdir()).joinpath("njopapoodmifmcogpingplfphojnfeea")
+    if not extension_folder.exists():
+        extension_folder.mkdir()
+        with zipfile.ZipFile(EXTENSION) as zip_file:
+            zip_file.extractall(extension_folder)
+    options.add_argument(f"--load-extension={extension_folder}")
 
     # we aren't loading the proxy rn because it's way way way too slow
     # proxy = fetch_working_proxy()
