@@ -52,7 +52,9 @@ def identify_websites(driver: WebDriver) -> dict[str, str]:
     return web_map
 
 
-def get_clean_driver(headless: bool = True, undetected: bool = True) -> WebDriver:
+def get_clean_driver(
+    headless: bool = True, undetected: bool = True, timeout: float = 60.0
+) -> WebDriver:
     logger.info("Creating driver...")
     options: ChromiumOptions = (uChromeOptions if undetected else Options)()
     options.add_argument(f"--load-extension={EXTENSION}")
@@ -70,7 +72,8 @@ def get_clean_driver(headless: bool = True, undetected: bool = True) -> WebDrive
         options.add_argument("--headless")
 
     driver: WebDriver = (uChrome if undetected else WebDriver)(**driver_kwargs)
-    driver.implicitly_wait(30)
+    driver.implicitly_wait(timeout)
+    driver.set_script_timeout(timeout)
 
     logger.info(f"Driver {driver.service.process.pid} started successfully.")
 

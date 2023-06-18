@@ -71,6 +71,7 @@ def generate(
     headful: bool = False,
     queries: int = -1,
     skip: int = 0,
+    timeout: float = 45.0,
 ) -> None:
     """
     Generate a basic csv from AMZScout data.
@@ -83,6 +84,7 @@ def generate(
         queries: The number of queries to run. Defaults to None, which means all queries.
         filename: The filename to write to. Defaults to "amzscout.csv".
         headful: Weather or not a Chrome window should be opened. This is only useful for debugging.
+        timeout: The number of seconds to wait for the page to load before giving up.
     """
     if verbose:
         logging.basicConfig(level=logging.INFO, handlers=[RichHandler()])
@@ -115,7 +117,7 @@ def generate(
                         driver.quit()
                     driver = None
                 if driver is None:
-                    driver = get_clean_driver(headless=not headful)
+                    driver = get_clean_driver(headless=not headful, timeout=timeout)
                 search_and_write(driver, csv_writer, query, write_headers=i == 0)
         finally:
             if driver is not None:

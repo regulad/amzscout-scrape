@@ -43,6 +43,14 @@ Make sure you install `chromedriver` on your system alongside a recent version o
 brew install chromedriver
 ```
 
+#### Scoop (Windows)
+
+Note: scoop only has chromedriver for win32 platforms. If you're on a 64-bit system, your mileage may vary.
+
+```bash
+scoop install chromedriver
+```
+
 #### Other platforms
 
 Refer to https://sites.google.com/chromium.org/driver/downloads?authuser=0 for instructions downloading chromedriver on your respective system.

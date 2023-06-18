@@ -18,13 +18,13 @@ permissions and limitations under the License.
 """
 import base64
 import logging
-from time import sleep
+from time import sleep, time
 from urllib.parse import urlencode
 
 from _csv import Writer
 from bs4 import BeautifulSoup
 from requests import Session as RequestsSession
-from selenium.common import StaleElementReferenceException
+from selenium.common import NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
 
@@ -52,6 +52,7 @@ def search_and_write(
     Returns:
 
     """
+    timeout = driver.timeouts.implicit_wait
     logger.info(f"Searching for {query!r}...")
 
     driver.get("https://www.amazon.com/s?" + urlencode({"k": query}))
@@ -108,6 +109,7 @@ def search_and_write(
     maintable = appwrap.find_element(By.CLASS_NAME, "maintable")
 
     # wait for the spinner to go away
+    spinner_wait_start = time()
     while True:
         # global spinner
         global_spinner = (
@@ -130,6 +132,17 @@ def search_and_write(
                 continue
 
         break
+    spinner_wait_end = time()
+    spinner_wait_time = (
+        spinner_wait_end - spinner_wait_start
+    )  # this is the amount of time we have already waited
+    if spinner_wait_time < timeout:
+        # we have waited less than the timeout, we should wait until more load in
+        sleep(timeout - spinner_wait_time)
+
+    # From here on out, we are just screenscraping and don't need to click anything
+    # To prevent stale element references, we are going to stop any currently running javascript
+    driver.execute_script("window.stop();")
 
     with RequestsSession() as s:
         # initialize the session with data from the driver
@@ -139,92 +152,102 @@ def search_and_write(
         rows_scraped = 0
         for i, row in enumerate(maintable.find_elements(By.CLASS_NAME, "maintable__row")):
             columns: list[str] = []
-            for j, col in enumerate(row.find_elements(By.CLASS_NAME, "scout-col")):
-                if j < 2:  # skip the first two columns, they are not important
-                    continue
-                # j = 2: number
-                # j = 3: title & image
-                try:
-                    if j != 3:
-                        columns.append(col.text)
-                    else:
-                        # column_names.append("Thumbnail Image")
-                        image_css = col.find_element(
-                            By.CSS_SELECTOR, "span.preview-img.ng-scope"
-                        ).value_of_css_property("background-image")
-                        if image_css == "none":
-                            image_b64 = ""
+            try:
+                for j, col in enumerate(row.find_elements(By.CLASS_NAME, "scout-col")):
+                    if j < 2:  # skip the first two columns, they are not important
+                        continue
+                    # j = 2: number
+                    # j = 3: title & image
+                    try:
+                        if j != 3:
+                            columns.append(col.text)
                         else:
-                            # this will be something like 'url("https://m.media-amazon.com/images/I/71Pn98gmz3L._SL300_.jpg")'
-                            image_url = image_css.split('"')[1]
-                            # this will be something like 'https://m.media-amazon.com/images/I/71Pn98gmz3L._SL300_.jpg'
-                            # we need to download the image and convert it to base64
-                            image_response = s.get(image_url)
-                            image_b64_string = base64.b64encode(image_response.content).decode(
-                                "utf-8"
-                            )
-                            image_b64 = f"data:{image_response.headers['Content-Type']};base64,{image_b64_string}"
+                            # column_names.append("Thumbnail Image")
+                            try:
+                                image_css = col.find_element(
+                                    By.CSS_SELECTOR, "span.preview-img.ng-scope"
+                                ).value_of_css_property("background-image")
+                            except NoSuchElementException:
+                                image_css = "none"
+                            if image_css == "none":
+                                image_b64 = ""
+                            else:
+                                # this will be something like 'url("https://m.media-amazon.com/images/I/71Pn98gmz3L._SL300_.jpg")'
+                                image_url = image_css.split('"')[1]
+                                # this will be something like 'https://m.media-amazon.com/images/I/71Pn98gmz3L._SL300_.jpg'
+                                # we need to download the image and convert it to base64
+                                image_response = s.get(image_url)
+                                image_b64_string = base64.b64encode(image_response.content).decode(
+                                    "utf-8"
+                                )
+                                image_b64 = f"data:{image_response.headers['Content-Type']};base64,{image_b64_string}"
 
-                        columns.append(image_b64)
+                            columns.append(image_b64)
 
-                        # column_names.append("Product Name")
-                        a = col.find_element(By.CSS_SELECTOR, "a.ng-binding")
-                        product_name = a.text
+                            # column_names.append("Product Name")
+                            a = col.find_element(By.CSS_SELECTOR, "a.ng-binding")
+                            product_name = a.text
 
-                        columns.append(product_name)
+                            columns.append(product_name)
 
-                        # column_names.append("URL")
-                        short_url = a.get_attribute("href")
+                            # column_names.append("URL")
+                            short_url = a.get_attribute("href")
 
-                        columns.append(short_url)
+                            columns.append(short_url)
 
-                        # OK, lets work on scraping the description & other data
-                        # gotta fetch it with the full url
-                        # i wanted to use requests & soup for this but it doesn't work perfect due to amazon's
-                        # bot screening & the description being super odd & dynamic
-                        logger.debug(f"Deep scraping {product_name} ({short_url})...")
-                        driver.switch_to.new_window("tab")
-                        driver.get(short_url)
-                        # while we are waiting for the page to road, we need to scratch out the AMZScout window
-                        # since we just want the amazon page
-                        driver.execute_script(
+                            # OK, lets work on scraping the description & other data
+                            # gotta fetch it with the full url
+                            # i wanted to use requests & soup for this but it doesn't work perfect due to amazon's
+                            # bot screening & the description being super odd & dynamic
+                            logger.info(f"Deep scraping {product_name} ({short_url})...")
+                            driver.switch_to.new_window("tab")
+                            driver.get(short_url)
+                            # while we are waiting for the page to road, we need to scratch out the AMZScout window
+                            # since we just want the amazon page
+                            driver.execute_script(
+                                """
+                                let ad = document.getElementsByTagName("amzscout-pro")[0];
+                                ad.parentNode.removeChild(ad); // do NOT return, it crashes selenium
                             """
-                            let ad = document.getElementsByTagName("amzscout-pro")[0];
-                            ad.parentNode.removeChild(ad); // do NOT return, it crashes selenium
-                        """
+                            )
+                            # lets try this:
+                            soup = BeautifulSoup(
+                                driver.page_source, "html.parser"
+                            )  # page_source is the DOM, not the source
+
+                            # column_names.append("Description")
+                            description = soup.find("div", id="productDescription")
+                            if description is not None:
+                                columns.append(description.text.strip())
+                            else:
+                                columns.append("")  # null(?)
+
+                            # column_names.append("About this item")
+                            about = soup.find("div", id="feature-bullets")
+                            if about is not None:
+                                columns.append(about.text.strip())
+                            else:
+                                columns.append("")  # null(?)
+
+                            # column_names.append("From the manufacturer")
+                            manufacturer = soup.find("div", id="aplus")
+                            if manufacturer is not None:
+                                columns.append(manufacturer.text.strip())
+                            else:
+                                columns.append("")  # null(?)
+
+                            logger.debug(f"Deep scraping {product_name} ({short_url})... done")
+                            driver.close()
+                            driver.switch_to.window(amazon_window_handle)
+                            # we continue now
+                    except StaleElementReferenceException as e:
+                        logger.warning(
+                            f"StaleElementReferenceException while scraping row {i} column {j}: {e}"
                         )
-                        # lets try this:
-                        soup = BeautifulSoup(
-                            driver.page_source, "html.parser"
-                        )  # page_source is the DOM, not the source
-
-                        # column_names.append("Description")
-                        description = soup.find("div", id="productDescription")
-                        if description is not None:
-                            columns.append(description.text.strip())
-                        else:
-                            columns.append("")  # null(?)
-
-                        # column_names.append("About this item")
-                        about = soup.find("div", id="feature-bullets")
-                        if about is not None:
-                            columns.append(about.text.strip())
-                        else:
-                            columns.append("")  # null(?)
-
-                        # column_names.append("From the manufacturer")
-                        manufacturer = soup.find("div", id="aplus")
-                        if manufacturer is not None:
-                            columns.append(manufacturer.text.strip())
-                        else:
-                            columns.append("")  # null(?)
-
-                        logger.debug(f"Deep scraping {product_name} ({short_url})... done")
-                        driver.close()
-                        driver.switch_to.window(amazon_window_handle)
-                        # we continue now
-                except StaleElementReferenceException as e:
-                    continue
+                        continue
+            except StaleElementReferenceException as e:
+                logger.warning(f"StaleElementReferenceException while scraping row {i}: {e}")
+                continue
             csv_writer.writerow(columns)
             rows_scraped += 1
 
