@@ -89,7 +89,7 @@ def generate(
     if verbose:
         logging.basicConfig(level=logging.INFO, handlers=[RichHandler()])
 
-    with AmzscoutscrapeAssets.path("amazon_products.txt").open("r") as fp:
+    with AmzscoutscrapeAssets.path("amazon_products.txt").open("r", encoding="utf-8") as fp:
         potential_queries = [line.strip() for line in fp.readlines()][skip:queries]
 
     filepath = Path(filename).absolute()
@@ -98,7 +98,7 @@ def generate(
         typer.echo(f"File {filepath.absolute()} already exists. Aborting.")
         raise typer.Abort()
 
-    with filepath.open("w", newline="") as fp:
+    with filepath.open("w", newline="", encoding="utf-8") as fp:
         csv_writer = cast(Writer, csv.writer(fp, dialect="excel"))
 
         typer.echo(f"Writing to {filepath.absolute()}")
@@ -118,7 +118,11 @@ def generate(
                     driver = None
                 if driver is None:
                     driver = get_clean_driver(headless=not headful, timeout=timeout)
-                search_and_write(driver, csv_writer, query, write_headers=i == 0)
+                try:
+                    search_and_write(driver, csv_writer, query, write_headers=i == 0)
+                except Exception as e:
+                    logger.exception(f"Error while processing query {query!r}: {e}")
+                    logger.info(f"Skipping {query!r}...")
         finally:
             if driver is not None:
                 driver.quit()

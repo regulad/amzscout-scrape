@@ -37,6 +37,7 @@ from .utils import reverse_map
 
 logger = logging.getLogger(__package__)
 EXTENSION = AmzscoutscrapeAssets.path("extensions", "extension_2_4_3_4.crx")
+EXTENSION_ID = "njopapoodmifmcogpingplfphojnfeea"
 
 
 def identify_websites(driver: WebDriver) -> dict[str, str]:
@@ -60,7 +61,8 @@ def get_clean_driver(
     logger.info("Creating driver...")
     options: ChromiumOptions = (uChromeOptions if undetected else Options)()
     # need to unpack the extension
-    extension_folder = Path(tempfile.gettempdir()).joinpath("njopapoodmifmcogpingplfphojnfeea")
+    extension_folder = Path(tempfile.gettempdir()).joinpath(f"chromium_extension_{EXTENSION_ID}")
+    # no shot something else uses this
     if not extension_folder.exists():
         extension_folder.mkdir()
         with zipfile.ZipFile(EXTENSION) as zip_file:

@@ -79,6 +79,7 @@ def search_and_write(
 
     # TODO: if we wanted to enable more headers or change any other options, we could do it here
 
+    # no stale protection needed here
     if write_headers:
         # We need to get the column names so that DA will be easier
         header = appwrap.find_element(By.CLASS_NAME, "maintable-header")
@@ -108,37 +109,46 @@ def search_and_write(
 
     maintable = appwrap.find_element(By.CLASS_NAME, "maintable")
 
-    # wait for the spinner to go away
+    # wait for the spinner(s) to go away
     spinner_wait_start = time()
     while True:
         # global spinner
-        global_spinner = (
+        if "ng-hide" not in (
             driver.find_element(By.TAG_NAME, "amzscout-pro")
             .find_element(By.CLASS_NAME, "modals")
             .find_element(By.CSS_SELECTOR, "div.spinner.centered")
-        )
-        classes = global_spinner.get_attribute("class")  # should be "spinner centered"
-        if "ng-hide" not in classes.split(" "):
+        ).get_attribute("class").split(" "):
             # the spinner not is hidden, we have to wait
             sleep(0.1)
             continue
 
+        continue_nonlocal = False  # if we should continue the outer loop
         # local spinners
         for local_spinner in maintable.find_elements(By.TAG_NAME, "loader-spinner"):
-            classes = local_spinner.get_attribute("class")  # should be "ng-hide" or ""
+            try:
+                classes = local_spinner.get_attribute("class")  # should be "ng-hide" or ""
+            except StaleElementReferenceException:
+                # the spinner is gone, we have to wait
+                continue_nonlocal = True
+                break
             if "ng-hide" not in classes.split(" "):
                 # the spinner not is hidden, we have to wait
-                sleep(0.1)
-                continue
+                continue_nonlocal = True
+                break
+        if continue_nonlocal:
+            sleep(0.1)
+            continue
 
         break
     spinner_wait_end = time()
     spinner_wait_time = (
         spinner_wait_end - spinner_wait_start
     )  # this is the amount of time we have already waited
-    if spinner_wait_time < timeout:
+    dynamic_timeout = timeout * 2
+    # this takes FOREVER to load, so we need to wait at least this much time
+    if spinner_wait_time < dynamic_timeout:
         # we have waited less than the timeout, we should wait until more load in
-        sleep(timeout - spinner_wait_time)
+        sleep(dynamic_timeout - spinner_wait_time)
 
     # From here on out, we are just screenscraping and don't need to click anything
     # To prevent stale element references, we are going to stop any currently running javascript
