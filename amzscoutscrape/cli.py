@@ -69,6 +69,7 @@ def generate(
     filename: str = "amzscout.csv",
     verbose: bool = False,
     headful: bool = False,
+    undetected: bool = True,
     queries: int = -1,
     skip: int = 0,
     timeout: float = 45.0,
@@ -84,6 +85,7 @@ def generate(
         queries: The number of queries to run. Defaults to None, which means all queries.
         filename: The filename to write to. Defaults to "amzscout.csv".
         headful: Weather or not a Chrome window should be opened. This is only useful for debugging.
+        undetected: Weather or not to use undetected_chromedriver. While undetected_chromedriver is more reliable, it is also slower and does not work on all systems.
         timeout: The number of seconds to wait for the page to load before giving up.
     """
     if verbose:
@@ -106,25 +108,35 @@ def generate(
         driver: WebDriver | None = None
 
         try:
+            fails = 0
             for i, query in track(
                 enumerate(potential_queries),
                 description="Scraping (this WILL take a while)...",
                 total=len(potential_queries),
             ):
                 # Every 14 queries, restart the browser to avoid getting blocked out.
-                if i % 14 == 0:
-                    if driver is not None:
-                        driver.quit()
+                if i % 14 == 0 and driver is not None:
+                    logger.info("Driver expired, killing...")
+                    driver.quit()
                     driver = None
                 if driver is None:
-                    driver = get_clean_driver(headless=not headful, timeout=timeout)
+                    logger.info("Creating new driver...")
+                    driver = get_clean_driver(
+                        headless=not headful, timeout=timeout, undetected=undetected
+                    )
                 try:
                     search_and_write(driver, csv_writer, query, write_headers=i == 0)
                 except Exception as e:
+                    fails += 1
                     logger.exception(f"Error while processing query {query!r}: {e}")
-                    logger.info(f"Skipping {query!r}...")
+                    logger.info(f"Skipping {query!r}, {fails} fails so far...")
+            logger.info(
+                f"Completed lookup of {len(potential_queries)} queries." f" {fails} failed."
+            )
+            logger.info(f"Fail rate: {fails / len(potential_queries) * 100:.2f}%")
         finally:
             if driver is not None:
+                logger.info("Closing driver...")
                 driver.quit()
 
         typer.echo("Done! Enjoy your freshly-picked data!")
