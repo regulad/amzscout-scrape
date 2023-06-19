@@ -32,7 +32,7 @@ from rich.progress import track
 from selenium.webdriver.chrome.webdriver import WebDriver
 
 from . import AmzscoutscrapeAssets, __copyright__, __title__, __version__, metadata
-from .driver import get_clean_driver
+from .driver import create_fresh_driver
 from .scrape import search_and_write
 
 logger = logging.getLogger(__package__)
@@ -121,7 +121,7 @@ def generate(
                 while driver is None:
                     logger.info("Attempting to create a new driver...")
                     try:
-                        driver = get_clean_driver(
+                        driver = create_fresh_driver(
                             headless=not headful,
                             timeout=timeout,
                             undetected=undetected,

@@ -18,12 +18,12 @@ permissions and limitations under the License.
 """
 import logging
 import tempfile
+import time
 import zipfile
 from pathlib import Path
 from time import sleep
 from typing import Any
-from urllib.parse import urlparse
-from uuid import uuid4
+from urllib.parse import urlencode, urlparse
 
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.webdriver import WebDriver
@@ -33,44 +33,12 @@ from undetected_chromedriver import Chrome as uChrome
 from undetected_chromedriver import ChromeOptions as uChromeOptions
 
 from . import AmzscoutscrapeAssets
+from .email import get_random_plausible_email
 from .utils import reverse_map
 
 logger = logging.getLogger(__package__)
 EXTENSION = AmzscoutscrapeAssets.path("extensions", "extension_2_4_3_4.crx")
 EXTENSION_ID = "njopapoodmifmcogpingplfphojnfeea"
-
-
-def get_clean_email_r(driver: WebDriver) -> str:
-    """
-    Get a random clean email that shouldn't already have an account attached
-    """
-    # Slight problem: AMZScout seems to have been detecting our scraping and is now locking out every
-    # non-gmail email. It's their fault for not using email verification & a captcha!
-    username = uuid4().hex
-    short_username = username[: int(len(username) // 4)]
-    domain = "gmail.com"
-    email = f"{short_username}@{domain}"
-    return email
-
-
-def get_clean_email_s(driver: WebDriver) -> str:
-    """
-    Get a clean email using selenium that shouldn't already have an account attached
-    """
-    old_tab = driver.current_window_handle
-
-    driver.switch_to.new_window("tab")
-    driver.get("https://temp-mail.org/en/")
-
-    while "Loading" in driver.find_element(By.ID, "mail").get_attribute("value"):
-        sleep(0.1)
-
-    email = driver.find_element(By.ID, "mail").get_attribute("value")
-
-    driver.close()
-    driver.switch_to.window(old_tab)
-
-    return email
 
 
 def identify_websites(driver: WebDriver) -> dict[str, str]:
@@ -88,13 +56,15 @@ def identify_websites(driver: WebDriver) -> dict[str, str]:
     return web_map
 
 
-def get_clean_driver(
+def _init_driver(
     headless: bool = True,
     undetected: bool = True,
     timeout: float = 60.0,
     proxy: None | str = None,
 ) -> WebDriver:
-    logger.info("Creating driver...")
+    """
+    Initialize a driver with the given options.
+    """
     options: ChromiumOptions = (uChromeOptions if undetected else Options)()
     # need to unpack the extension
     extension_folder = Path(tempfile.gettempdir()).joinpath(f"chromium_extension_{EXTENSION_ID}")
@@ -124,20 +94,45 @@ def get_clean_driver(
 
     logger.info(f"Driver {driver.service.process.pid} started successfully.")
 
+    return driver
+
+
+def create_fresh_driver(
+    headless: bool = True,
+    undetected: bool = True,
+    timeout: float = 60.0,
+    proxy: None | str = None,
+) -> WebDriver:
+    # We need to make sure we don't spend too long, otherwise something definitely crashed and we need to restart
+
+    driver = _init_driver(headless, undetected, timeout, proxy)
+
     # Driver ready. Extension initialization.
     # Switch to the new tab
 
-    while len(driver.window_handles) < 2:
+    # AMZScout will sometimes open a new tab, sometimes not. We need to wait for it to open a new tab.
+    started_waiting_for_extension_tab_at = time.time()
+    waited_so_far: float = 0.0
+    while len(driver.window_handles) < 2 and waited_so_far < timeout:
+        waited_so_far = time.time() - started_waiting_for_extension_tab_at
         sleep(0.1)
+    if len(driver.window_handles) < 2:
+        logger.warning(
+            "AMZScout did not open a new tab. This is not expected behavior. Attempting to correct..."
+        )
+        # Let's just make it manually.
+        driver.get(
+            "https://www.amazon.com/s?" + urlencode({"k": "fleshlight"})
+        )  # i may have an immature sense of humor
+        driver.find_element(By.TAG_NAME, "os-circle").click()  # we have to manually open the menu
+
     web_map = identify_websites(driver)
 
     amazon_tab = reverse_map(web_map, "www.amazon.com")
     chrome_start_tab = reverse_map(web_map, "welcome")
     del web_map
 
-    # Ok, so this is dumb. We are going to make a temp email and use that to sign up.
-    # Normally, there are a million websites for this. But we, we don't buy services. WE DO SOME SCRAPING!
-    email = get_clean_email_r(driver)
+    email = get_random_plausible_email(driver)
 
     # Login!
 
@@ -147,7 +142,6 @@ def get_clean_driver(
     driver.find_element(By.CLASS_NAME, "login-btn").click()
     # We will now be redirected to the login page
     driver.find_element(By.TAG_NAME, "input").send_keys(email)
-    del email  # We don't need this anymore
     driver.find_element(By.CLASS_NAME, "PgAuth-Sign-form__btn").click()
     while "amazon" not in urlparse(driver.current_url).hostname.split("."):  # type: ignore
         sleep(0.1)
@@ -163,4 +157,4 @@ def get_clean_driver(
     return driver
 
 
-__all__ = ("get_clean_driver",)
+__all__ = ("create_fresh_driver",)
