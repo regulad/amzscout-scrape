@@ -23,7 +23,7 @@ import csv
 import logging
 import time
 from pathlib import Path
-from typing import cast
+from typing import Optional, cast
 
 import typer
 from _csv import Writer
@@ -73,6 +73,7 @@ def generate(
     queries: int = -1,
     skip: int = 0,
     timeout: float = 45.0,
+    proxy: Optional[str] = None,
 ) -> None:
     """
     Generate a basic csv from AMZScout data.
@@ -87,6 +88,7 @@ def generate(
         headful: Weather or not a Chrome window should be opened. This is only useful for debugging.
         undetected: Weather or not to use undetected_chromedriver. While undetected_chromedriver is more reliable, it is also slower and does not work on all systems.
         timeout: The number of seconds to wait for the page to load before giving up.
+        proxy: A proxy to use. If left unspecified, the system proxy will be utilized. If set to "direct://" no proxy will be used.
     """
     if verbose:
         logging.basicConfig(level=logging.INFO, handlers=[RichHandler()])
@@ -120,14 +122,23 @@ def generate(
                     logger.info("Attempting to create a new driver...")
                     try:
                         driver = get_clean_driver(
-                            headless=not headful, timeout=timeout, undetected=undetected
+                            headless=not headful,
+                            timeout=timeout,
+                            undetected=undetected,
+                            proxy=proxy,
                         )
                     except Exception as e:
                         logger.exception(f"Error while creating driver: {e}")
                         logger.info("Retrying...")
                 try:
-                    logger.info(f"Starting {query!r}, #{i}...")
-                    search_and_write(driver, csv_writer, query, write_headers=i == 0 and not exists)
+                    logger.info(f"Starting {query!r}, #{i + skip}...")
+                    search_and_write(
+                        driver,
+                        csv_writer,
+                        query,
+                        write_headers=i == 0 and not exists,
+                        proxy=proxy,
+                    )
                 except Exception as e:
                     fails += 1
                     logger.exception(f"Error while processing query {query!r}: {e}")

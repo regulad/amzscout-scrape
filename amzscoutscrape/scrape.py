@@ -28,6 +28,8 @@ from selenium.common import NoSuchElementException, StaleElementReferenceExcepti
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
 
+from .proxy import setup_proxy_for_requests
+
 logger = logging.getLogger(__package__)
 
 
@@ -35,6 +37,7 @@ def search_and_write(
     driver: WebDriver,
     csv_writer: Writer,
     query: str,
+    proxy: str | None = None,
     *,
     write_headers: bool = True,
     write_data: bool = True,
@@ -45,6 +48,7 @@ def search_and_write(
     Args:
         driver:
         csv_writer:
+        proxy:
         query:
         write_headers:
         write_data:
@@ -158,6 +162,7 @@ def search_and_write(
         # initialize the session with data from the driver
         # s.cookies.update({c["name"]: c["value"] for c in driver.get_cookies()})  # unnecessary
         s.headers.update({"User-Agent": driver.execute_script("return navigator.userAgent")})
+        setup_proxy_for_requests(s, proxy)
         # ok, lets scrape!
         rows_scraped = 0
         for i, row in enumerate(maintable.find_elements(By.CLASS_NAME, "maintable__row")):

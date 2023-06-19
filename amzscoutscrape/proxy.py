@@ -44,7 +44,23 @@ def _fetch_proxies() -> Sequence[dict]:
     return cast(Sequence[dict], _CACHE)
 
 
-def fetch_working_proxy() -> str:
+def setup_proxy_for_requests(session: Session, proxy: str | None = None) -> None:
+    if proxy is None:
+        return
+
+    if proxy == "direct://":
+        session.trust_env = False
+        return
+
+    proxies = {
+        "http": proxy,
+        "https": proxy,
+        "ftp": proxy,
+    }
+    session.proxies.update(proxies)
+
+
+def fetch_working_geonode_proxy() -> str:
     """
     Get a random SOCKS5 proxy from proxylist.geonode.com.
     Returns: A SOCKS5 proxy.
@@ -101,4 +117,4 @@ def fetch_working_proxy() -> str:
         return good_proxy
 
 
-__all__ = ["fetch_working_proxy"]
+__all__ = ["fetch_working_geonode_proxy", "setup_proxy_for_requests"]

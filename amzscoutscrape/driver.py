@@ -23,6 +23,7 @@ from pathlib import Path
 from time import sleep
 from typing import Any
 from urllib.parse import urlparse
+from uuid import uuid4
 
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.webdriver import WebDriver
@@ -32,12 +33,44 @@ from undetected_chromedriver import Chrome as uChrome
 from undetected_chromedriver import ChromeOptions as uChromeOptions
 
 from . import AmzscoutscrapeAssets
-from .proxy import fetch_working_proxy
 from .utils import reverse_map
 
 logger = logging.getLogger(__package__)
 EXTENSION = AmzscoutscrapeAssets.path("extensions", "extension_2_4_3_4.crx")
 EXTENSION_ID = "njopapoodmifmcogpingplfphojnfeea"
+
+
+def get_clean_email_r(driver: WebDriver) -> str:
+    """
+    Get a random clean email that shouldn't already have an account attached
+    """
+    # Slight problem: AMZScout seems to have been detecting our scraping and is now locking out every
+    # non-gmail email. It's their fault for not using email verification & a captcha!
+    username = uuid4().hex
+    short_username = username[: int(len(username) // 4)]
+    domain = "gmail.com"
+    email = f"{short_username}@{domain}"
+    return email
+
+
+def get_clean_email_s(driver: WebDriver) -> str:
+    """
+    Get a clean email using selenium that shouldn't already have an account attached
+    """
+    old_tab = driver.current_window_handle
+
+    driver.switch_to.new_window("tab")
+    driver.get("https://temp-mail.org/en/")
+
+    while "Loading" in driver.find_element(By.ID, "mail").get_attribute("value"):
+        sleep(0.1)
+
+    email = driver.find_element(By.ID, "mail").get_attribute("value")
+
+    driver.close()
+    driver.switch_to.window(old_tab)
+
+    return email
 
 
 def identify_websites(driver: WebDriver) -> dict[str, str]:
@@ -56,7 +89,10 @@ def identify_websites(driver: WebDriver) -> dict[str, str]:
 
 
 def get_clean_driver(
-    headless: bool = True, undetected: bool = True, timeout: float = 60.0
+    headless: bool = True,
+    undetected: bool = True,
+    timeout: float = 60.0,
+    proxy: None | str = None,
 ) -> WebDriver:
     logger.info("Creating driver...")
     options: ChromiumOptions = (uChromeOptions if undetected else Options)()
@@ -69,9 +105,10 @@ def get_clean_driver(
             zip_file.extractall(extension_folder)
     options.add_argument(f"--load-extension={extension_folder}")
 
-    # we aren't loading the proxy rn because it's way way way too slow
-    # proxy = fetch_working_proxy()
-    # options.add_argument(f"""--proxy-server={proxy}""")
+    # we aren't loading the proxy from geonode rn because it's way way way too slow
+    if proxy is not None:
+        logger.info(f"Proxy {proxy} found. Using.")
+        options.add_argument(f"""--proxy-server={proxy}""")
 
     driver_kwargs: dict[str, Any] = {"options": options}
 
@@ -100,15 +137,7 @@ def get_clean_driver(
 
     # Ok, so this is dumb. We are going to make a temp email and use that to sign up.
     # Normally, there are a million websites for this. But we, we don't buy services. WE DO SOME SCRAPING!
-    driver.switch_to.new_window("tab")
-    driver.get("https://temp-mail.org/en/")
-
-    while "Loading" in driver.find_element(By.ID, "mail").get_attribute("value"):
-        sleep(0.1)
-
-    email = driver.find_element(By.ID, "mail").get_attribute("value")
-
-    driver.close()
+    email = get_clean_email_r(driver)
 
     # Login!
 

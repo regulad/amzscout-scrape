@@ -86,6 +86,22 @@ It will keep you updated, although it will take a hot minute.
 
 Once it's done, you'll have a CSV file in the current directory.
 
+## Proxy
+
+Included is a simple Tailscale configuration that serves a SOCKS5 proxy on your local machine.
+
+Copy the contents of `proxy.env-example` into `.env`, populate the fields and then perform the following command on a machine that has docker installed:
+
+```bash
+docker-compose up -d
+```
+
+Then, you can use the `--proxy` flag to use the proxy.
+
+```bash
+poetry run amzscout-scrape --proxy socks5://localhost:1055
+```
+
 # Appendix
 
 Licensed under the terms of the [Apache License 2.0](https://spdx.org/licenses/Apache-2.0.html).
