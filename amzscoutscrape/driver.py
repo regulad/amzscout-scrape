@@ -17,12 +17,14 @@ permissions and limitations under the License.
 
 """
 import logging
+import os
 import tempfile
 import time
+import winreg
 import zipfile
 from pathlib import Path
 from time import sleep
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlencode, urlparse
 
 from selenium.webdriver.chrome.options import Options
@@ -39,6 +41,11 @@ from .utils import reverse_map
 logger = logging.getLogger(__package__)
 EXTENSION = AmzscoutscrapeAssets.path("extensions", "extension_2_4_3_4.crx")
 EXTENSION_ID = "njopapoodmifmcogpingplfphojnfeea"
+
+# https://admx.help/?Category=Chrome&Policy=Google.Policies.Chrome::BackgroundModeEnabled
+WIN_REGISTRY_SCOPE = winreg.HKEY_CURRENT_USER
+WIN_REGISTRY_VALUE_NAME = r"BackgroundModeEnabled"
+WIN_REGISTRY_VALUE_TYPE = winreg.REG_DWORD
 
 
 def identify_websites(driver: WebDriver) -> dict[str, str]:
@@ -65,6 +72,36 @@ def _init_driver(
     """
     Initialize a driver with the given options.
     """
+
+    # windows registry key: Software\Policies\Google\Chrome\BackgroundModeEnabled
+    # WHY CAN THIS NOT BE DISABLED WITH A SWITCH
+    # WHY DOES IT HAVE TO BE A REGISTRY KEY
+    # FUCK YOU GOOGLE
+
+    if os.name == "nt" and headless and undetected:
+        # TODO: Maybe undo this after we are done?
+        logger.warning(
+            "You are running on windows. "
+            "We are going to attempt to make a registry modification so the headless chrome does not "
+            "continue as a background process after UC is closed."
+        )
+        try:
+            registry_key = winreg.CreateKeyEx(
+                WIN_REGISTRY_SCOPE, r"Software\Policies\Google\Chrome", 0, winreg.KEY_WRITE
+            )
+            current_value = cast(int, winreg.QueryValueEx(registry_key, WIN_REGISTRY_VALUE_NAME))
+            background_mode_enabled = True if current_value == 1 else 0
+            if background_mode_enabled:
+                winreg.SetValueEx(
+                    WIN_REGISTRY_SCOPE, WIN_REGISTRY_VALUE_NAME, 0, WIN_REGISTRY_VALUE_TYPE, 0
+                )
+        except WindowsError as w_e:
+            logger.exception(f"Unable to disable Background Mode: {w_e}")
+            logger.warning("You may notice background chrome processes piling up.")
+        finally:
+            if "registry_key" in locals():
+                winreg.CloseKey(registry_key)
+
     options: ChromiumOptions = (uChromeOptions if undetected else Options)()
     # need to unpack the extension
     extension_folder = Path(tempfile.gettempdir()).joinpath(f"chromium_extension_{EXTENSION_ID}")
