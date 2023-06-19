@@ -33,11 +33,29 @@ This uses undetected chromedriver and the [AMZScout extension `njopapoodmifmcogp
 
 ## Dependencies
 
+### Chrome or Chromium
+
+#### Windows
+
+```bash
+winget install --id Google.Chrome
+```
+
+#### Ubuntu & Debian
+
+```bash
+sudo apt-get install chromium-browser
+```
+
+#### MacOS & Other
+
+Download [here](https://www.google.com/chrome/) like anywhere else
+
 ### `chromedriver`
 
 Make sure you install `chromedriver` on your system alongside a recent version of Chrome or Chromium.
 
-#### brew (macOS & Linux)
+#### brew (macOS only)
 
 ```bash
 brew install chromedriver

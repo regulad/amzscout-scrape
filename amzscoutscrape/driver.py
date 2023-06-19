@@ -20,7 +20,6 @@ import logging
 import os
 import tempfile
 import time
-import winreg
 import zipfile
 from pathlib import Path
 from time import sleep
@@ -41,11 +40,6 @@ from .utils import reverse_map
 logger = logging.getLogger(__package__)
 EXTENSION = AmzscoutscrapeAssets.path("extensions", "extension_2_4_3_4.crx")
 EXTENSION_ID = "njopapoodmifmcogpingplfphojnfeea"
-
-# https://admx.help/?Category=Chrome&Policy=Google.Policies.Chrome::BackgroundModeEnabled
-WIN_REGISTRY_SCOPE = winreg.HKEY_CURRENT_USER
-WIN_REGISTRY_VALUE_NAME = r"BackgroundModeEnabled"
-WIN_REGISTRY_VALUE_TYPE = winreg.REG_DWORD
 
 
 def identify_websites(driver: WebDriver) -> dict[str, str]:
@@ -79,6 +73,13 @@ def _init_driver(
     # FUCK YOU GOOGLE
 
     if os.name == "nt" and headless and undetected:
+        import winreg
+
+        # https://admx.help/?Category=Chrome&Policy=Google.Policies.Chrome::BackgroundModeEnabled
+        WIN_REGISTRY_SCOPE = winreg.HKEY_CURRENT_USER
+        WIN_REGISTRY_VALUE_NAME = r"BackgroundModeEnabled"
+        WIN_REGISTRY_VALUE_TYPE = winreg.REG_DWORD
+
         # TODO: Maybe undo this after we are done?
         logger.warning(
             "You are running on windows. "
