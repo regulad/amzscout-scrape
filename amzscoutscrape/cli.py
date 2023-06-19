@@ -96,11 +96,8 @@ def generate(
 
     filepath = Path(filename).absolute()
 
-    if filepath.exists():
-        typer.echo(f"File {filepath.absolute()} already exists. Aborting.")
-        raise typer.Abort()
-
-    with filepath.open("w", newline="", encoding="utf-8") as fp:
+    exists = filepath.exists()
+    with filepath.open("w" if not exists else "a", newline="", encoding="utf-8") as fp:
         csv_writer = cast(Writer, csv.writer(fp, dialect="excel"))
 
         typer.echo(f"Writing to {filepath.absolute()}")
@@ -125,7 +122,8 @@ def generate(
                         headless=not headful, timeout=timeout, undetected=undetected
                     )
                 try:
-                    search_and_write(driver, csv_writer, query, write_headers=i == 0)
+                    logger.info(f"Starting {query!r}, #{i}...")
+                    search_and_write(driver, csv_writer, query, write_headers=i == 0 and not exists)
                 except Exception as e:
                     fails += 1
                     logger.exception(f"Error while processing query {query!r}: {e}")
