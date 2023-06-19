@@ -116,11 +116,15 @@ def generate(
                     logger.info("Driver expired, killing...")
                     driver.quit()
                     driver = None
-                if driver is None:
-                    logger.info("Creating new driver...")
-                    driver = get_clean_driver(
-                        headless=not headful, timeout=timeout, undetected=undetected
-                    )
+                while driver is None:
+                    logger.info("Attempting to create a new driver...")
+                    try:
+                        driver = get_clean_driver(
+                            headless=not headful, timeout=timeout, undetected=undetected
+                        )
+                    except Exception as e:
+                        logger.exception(f"Error while creating driver: {e}")
+                        logger.info("Retrying...")
                 try:
                     logger.info(f"Starting {query!r}, #{i}...")
                     search_and_write(driver, csv_writer, query, write_headers=i == 0 and not exists)
