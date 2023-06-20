@@ -25,15 +25,18 @@ from _csv import Writer
 from bs4 import BeautifulSoup
 from requests import Session as RequestsSession
 from selenium.common import NoSuchElementException, StaleElementReferenceException
-from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.support import expected_conditions as ec
+from selenium.webdriver.support.wait import WebDriverWait
 
 from .proxy import setup_proxy_for_requests
+from .utils import deprecated
 
 logger = logging.getLogger(__package__)
 
 
-def search_and_write(
+def search_and_write_amazon(
     driver: WebDriver,
     csv_writer: Writer,
     query: str,
@@ -56,6 +59,8 @@ def search_and_write(
     Returns:
 
     """
+    wait = WebDriverWait(driver, driver.timeouts.implicit_wait)
+    # TODO: replace timeout dependent code with WebDriverWait
     timeout = driver.timeouts.implicit_wait
     logger.info(f"Searching for {query!r}...")
 
@@ -272,4 +277,83 @@ def search_and_write(
     # get only being the best of the best
 
 
-__all__ = ["search_and_write"]
+AMZSCOUT_DB_SITE = "https://amzscout.net/app/#/database"
+
+
+@deprecated
+def search_and_write_amzscout(
+    driver: WebDriver,
+    csv_writer: Writer,
+    query: str,
+    proxy: str | None = None,
+    *,
+    write_headers: bool = True,
+    write_data: bool = True,
+) -> None:
+    """
+    Search for a query and write the results to a CSV file.
+
+    Args:
+        driver:
+        csv_writer:
+        proxy:
+        query:
+        write_headers:
+        write_data:
+
+    Returns:
+
+    """
+    wait = WebDriverWait(driver, driver.timeouts.implicit_wait)
+
+    logger.info(f"Searching for {query!r}...")
+
+    if driver.current_url != AMZSCOUT_DB_SITE:
+        driver.get(AMZSCOUT_DB_SITE)
+    else:
+        driver.refresh()  # don't waste time
+
+    # TODO: Filters go here
+
+    # enter prompt
+    (driver.find_element(By.ID, "keywords").find_element(By.TAG_NAME, "input").send_keys(query))
+
+    # click "FIND PRODUCTS"
+    wait.until(
+        ec.element_to_be_clickable((By.CSS_SELECTOR, "button.db-filters__controlls-find-btn"))
+    ).click()
+    if distraction := ec.element_to_be_clickable(
+        (By.CSS_SELECTOR, "app-filter-attention button.btn")
+    )(driver):
+        distraction.click()  # close the "attention" popup
+        wait.until(
+            ec.element_to_be_clickable((By.CSS_SELECTOR, "button.db-filters__controlls-find-btn"))
+        ).click()
+        # run it back
+
+    # wait for results to load
+    wait.until(ec.visibility_of_element_located((By.CSS_SELECTOR, "div.loader__text")))
+    wait.until(ec.invisibility_of_element_located((By.CSS_SELECTOR, "div.loader__text")))
+
+    if write_headers:
+        # TODO: Write headers here
+        pass
+
+    if write_data:
+        if driver.find_element(By.CSS_SELECTOR, "div.empty-row").is_displayed():
+            logger.warning(f"No results found for query {query!r}, skipping...")
+        else:
+            # TODO: Write data here
+            pass
+
+    raise NotImplementedError(
+        "I didn't get this far, sorry! Please use the extension mode for now."
+    )
+    # for a couple different reasons, doing this without the extension is a pretty dumb idea.
+    # #1: the rate limit for the dedicated website is a lot lower (more accounts = more IPs)
+    # #2: amazon loading is not the rate limit of the project
+    # #3: less products on dedicated website
+    # its for all these reasons i wont continue developing the dedicated website scraper.
+
+
+__all__ = ("search_and_write_amzscout", "search_and_write_amazon")

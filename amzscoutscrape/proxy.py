@@ -17,9 +17,7 @@ permissions and limitations under the License.
 
 """
 import logging
-import random
 from concurrent.futures import ThreadPoolExecutor
-from copy import copy
 from functools import partial
 from threading import Event
 from typing import Sequence, cast
@@ -117,4 +115,11 @@ def fetch_working_geonode_proxy() -> str:
         return good_proxy
 
 
-__all__ = ["fetch_working_geonode_proxy", "setup_proxy_for_requests"]
+def ip_of(proxy: str) -> str:
+    with Session() as s:
+        setup_proxy_for_requests(s, proxy)
+        with s.get("https://api.ipify.org") as r:
+            return r.text
+
+
+__all__ = ("fetch_working_geonode_proxy", "setup_proxy_for_requests", "ip_of")
